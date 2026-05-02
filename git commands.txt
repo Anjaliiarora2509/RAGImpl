@@ -1,0 +1,11 @@
+git remote -v
+git remote set-url origin https://github.com/anjaliiarora2509/RAGImpl.git
+git add .gitignore
+git commit -m "Add .gitignore"
+git push origin main
+git log --oneline
+git filter-branch --force --index-filter "git rm --cached --ignore-unmatch .env" --prune-empty --tag-name-filter cat -- --all
+git for-each-ref --format="delete %(refname)" refs/original | git update-ref --stdin
+git reflog expire --expire=now --all
+git gc --prune=now --quiet
+git push origin main --force
