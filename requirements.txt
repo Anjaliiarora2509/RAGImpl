@@ -2,3 +2,5 @@ groq
 python-dotenv
 uvicorn[standard]
 pypdf
+chromadb
+sentence-transformers

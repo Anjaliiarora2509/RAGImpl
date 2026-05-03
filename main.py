@@ -3,6 +3,7 @@ from groq import Groq
 from dotenv import load_dotenv
 
 from ingestion import ingest_docs
+from vector_store import HuggingFaceEmbedder, ChromaVectorStore
 
 load_dotenv()
 
@@ -24,12 +25,12 @@ def chat(messages: list[dict], model: str = "llama-3.3-70b-versatile") -> str:
 
 
 if __name__ == "__main__":
-    # messages = [
-    #     {"role": "user", "content": "Hello! How are you?"},
-    # ]
-    # reply = chat(messages)
-    # print(reply)
     chunks = ingest_docs()
     print(f"Loaded {len(chunks)} chunks")
-    for c in chunks:
-        print(c.chunk_id, c.text)
+
+    embedder = HuggingFaceEmbedder()
+    store = ChromaVectorStore()
+
+    store.add(chunks)
+
+    print("Chunks embedded and stored in vector store.")
