@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import config
 from ingestion import ingest_docs, Chunk
 from vector_store import HuggingFaceEmbedder, ChromaVectorStore
-from retrieval import SimilarityRetriever
+from retrieval import BaseRetriever, HybridRetriever
 
 load_dotenv()
 
@@ -21,7 +21,7 @@ def build_context(chunks: list[Chunk]) -> str:
     return "\n\n".join(f"[{c.source}]\n{c.text}" for c in chunks)
 
 
-def chat(query: str, retriever: SimilarityRetriever, k: int = 5) -> str:
+def chat(query: str, retriever: BaseRetriever, k: int = 5) -> str:
     chunks = retriever.retrieve(query, k=k)
     context = build_context(chunks)
     messages = [
@@ -46,9 +46,9 @@ if __name__ == "__main__":
     store.add(chunks)
     print("Chunks stored in vector store.")
 
-    # --- Retrieval + LLM ---
-    retriever = SimilarityRetriever(embedder, store)
-    query = "What is this document about?"
+    # --- Hybrid Retrieval + LLM ---
+    retriever = HybridRetriever(embedder, store, chunks)
+    query = "What does Article 9 say?"
     print(f"\nQuery: {query}")
     answer = chat(query, retriever)
     print(f"Answer: {answer}")
