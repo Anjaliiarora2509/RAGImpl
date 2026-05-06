@@ -148,11 +148,119 @@ Hybrid catches both. You almost never miss a relevant chunk just because the wor
 
 ---
 
+## Reciprocal Rank Fusion (RRF) — How the Merging Works
+
+After hybrid retrieval you have two separate ranked lists. RRF merges them into one fairly.
+
+### The Problem
+
+```
+Dense list          BM25 list
+───────────         ───────────
+1. Chunk A          1. Chunk C
+2. Chunk B          2. Chunk A
+3. Chunk C          3. Chunk D
+4. Chunk D          4. Chunk B
+```
+
+Which list do you trust? You do not pick one — you merge them by rewarding chunks that rank well in both.
+
+### The Formula
+
+For every chunk, add up a score based on its position in each list:
+
+```
+score = 1 / (60 + rank)
+```
+
+The `60` is a smoothing constant — it stops rank #1 from dominating too hard. It is always 60 by default.
+
+### Walking Through the Example
+
+```
+Chunk A → rank 1 in dense,  rank 2 in BM25
+score   = 1/(60+1) + 1/(60+2) = 0.0164 + 0.0161 = 0.0325
+
+Chunk C → rank 3 in dense,  rank 1 in BM25
+score   = 1/(60+3) + 1/(60+1) = 0.0159 + 0.0164 = 0.0323
+
+Chunk B → rank 2 in dense,  rank 4 in BM25
+score   = 1/(60+2) + 1/(60+4) = 0.0161 + 0.0156 = 0.0317
+
+Chunk D → rank 4 in dense,  rank 3 in BM25
+score   = 1/(60+4) + 1/(60+3) = 0.0156 + 0.0159 = 0.0315
+```
+
+Final merged ranking:
+
+```
+1. Chunk A  (0.0325)  ← appeared high in BOTH lists
+2. Chunk C  (0.0323)
+3. Chunk B  (0.0317)
+4. Chunk D  (0.0315)
+```
+
+**Chunk A wins because it ranked well in both lists.** That is the key insight of RRF.
+
+### The Key Insight
+
+> A chunk that ranks **moderately well in both lists** beats a chunk that ranks **#1 in only one list**.
+
+If both dense and BM25 agree a chunk is relevant, it almost certainly is.
+
+---
+
+## Why rrf_k Is 60
+
+The short answer — it is not derived from a formula, it is chosen from experiments.
+
+The value `60` came from the original RRF research paper (Cormack, Clarke, Buettcher — 2009). They ran experiments across many document collections and found that `k=60` gave the best results consistently.
+
+They tested other values too:
+
+```
+k = 10   → rank #1 dominates too much, lower ranks ignored
+k = 20   → still too aggressive
+k = 60   → sweet spot, balanced across all ranks
+k = 100  → too flat, rank #1 and rank #20 treated almost equally
+```
+
+### What It Controls — A Sensitivity Dial
+
+```
+Small k  → system heavily rewards rank #1, ignores the rest
+Large k  → system treats all ranks almost equally (too flat)
+k = 60   → balanced — rank #1 matters more, but lower ranks still contribute
+```
+
+Concretely, the gap between rank #1 and rank #10:
+
+```
+k = 10                              k = 60
+rank 1  → 1/11 = 0.0909            rank 1  → 1/61 = 0.0164
+rank 10 → 1/20 = 0.0500            rank 10 → 1/70 = 0.0143
+gap     = 0.0409  (huge)           gap     = 0.0021  (small, fair)
+```
+
+With `k=10` rank #1 dominates. With `k=60` every rank contributes fairly.
+
+### Should You Change It?
+
+For this project — no, keep it at 60. You would only tune it if:
+- You have thousands of documents
+- You have a labelled evaluation dataset (RAGAS scores)
+- You can measure that a different value actually improves results
+
+Without measurement, changing it is just guessing.
+
+---
+
 ## Summary
 
 > Dense retrieval is great out of the box for meaning-based queries.
 > BM25 is great for exact terms, codes, and IDs.
 > Hybrid combines both — and is the standard approach in production RAG systems.
 
+For this project: the dense-only system works well for the Emirates ticket at its current size. As more documents are added, switching to hybrid retrieval will prevent exact-code lookup failures without adding significant complexity or cost.
 
-![alt text](image.png)
+See [rrf_diagram.md](rrf_diagram.md) for a visual walkthrough of RRF.
